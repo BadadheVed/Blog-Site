@@ -8,5 +8,5 @@ import (
 
 func main() {
 	config.DBConnect()
-	fmt.Println("Databse connected sucessfully")
+	fmt.Println("Database connected sucessfully")
 }
