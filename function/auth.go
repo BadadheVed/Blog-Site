@@ -9,6 +9,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/yourname/blog-kafka/config"
+	middleware "github.com/yourname/blog-kafka/middlewares"
 	"github.com/yourname/blog-kafka/models"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -93,4 +94,22 @@ func Login(c *gin.Context) {
 	c.SetCookie("token", tokenStr, 3600*24, "/", "", false, true)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Login successful"})
+}
+
+func GetAllUsers(c *gin.Context) {
+	_, _, ok := middleware.ExtractUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	var users []models.User
+
+	if err := config.DB.Select("id", "name", "email", "created_at").Find(&users).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch users"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"users": users})
+
 }
