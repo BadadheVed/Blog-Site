@@ -35,6 +35,8 @@ func DBConnect() {
 		&models.User{},
 		&models.Channel{},
 		&models.ChannelMember{},
+		&models.Blog{},
+		&models.Notification{},
 	)
 
 	if err != nil {

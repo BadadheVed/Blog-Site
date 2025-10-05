@@ -57,12 +57,11 @@ func AuthMiddleware() gin.HandlerFunc {
 	}
 }
 
-// Extract helper
 func ExtractUser(c *gin.Context) (string, string, bool) {
 	uid, ok1 := c.Get("userID")
-	name, ok2 := c.Get("name")
+	email, ok2 := c.Get("email")
 	if !ok1 || !ok2 {
 		return "", "", false
 	}
-	return uid.(string), name.(string), true
+	return uid.(string), email.(string), true
 }

@@ -8,11 +8,10 @@ import (
 )
 
 func ChannelRoutes(r *gin.Engine) {
-	ch := r.Group("/channels")
+	ch := r.Group("/channel")
 	ch.Use(middleware.AuthMiddleware())
 	{
-		ch.POST("/", function.CreateChannel)
+		ch.POST("/create", function.CreateChannel)
 		ch.POST("/:id/subscribe", function.SubscribeChannel)
-
 	}
 }

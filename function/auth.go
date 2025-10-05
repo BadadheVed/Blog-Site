@@ -44,18 +44,6 @@ func Signup(c *gin.Context) {
 		return
 	}
 
-	// Generate token
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id": user.Id.String(),
-		"name":    user.Name,
-		"exp":     time.Now().Add(24 * time.Hour).Unix(),
-	})
-
-	tokenStr, _ := token.SignedString(jwtSecret)
-
-	// Store in cookies
-	c.SetCookie("token", tokenStr, 3600*24, "/", "", false, true)
-
 	c.JSON(http.StatusCreated, gin.H{"message": "Signup successful"})
 }
 
@@ -84,7 +72,7 @@ func Login(c *gin.Context) {
 	// Create JWT with name in claims
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": user.Id.String(),
-		"name":    user.Name,
+		"email":   user.Email,
 		"exp":     time.Now().Add(24 * time.Hour).Unix(),
 	})
 

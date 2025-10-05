@@ -58,7 +58,15 @@ func CreateChannel(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "Channel created & subscribed", "subscription": sub})
+	if err := config.DB.Preload("User").Preload("Channel").First(&sub, "id = ?", sub.ID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load associations"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message":      "Channel created & subscribed",
+		"subscription": sub,
+	})
 }
 
 func SubscribeChannel(c *gin.Context) {
