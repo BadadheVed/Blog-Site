@@ -8,6 +8,6 @@ func SetupRouter() *gin.Engine {
 	authRouter(r)
 
 	ChannelRoutes(r)
-
+	blogRouter(r)
 	return r
 }

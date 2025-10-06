@@ -131,3 +131,40 @@ func SubscribeChannel(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Subscribed successfully", "Channel Is": sub, "member_count": size})
 }
+
+func GetChannels(c *gin.Context) {
+	userIDStr, _, ok := middleware.ExtractUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+		return
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id in token"})
+		return
+	}
+
+	var channels []models.Channel
+
+	err = config.DB.
+		Model(&models.Channel{}).
+		Joins("JOIN channel_members ON channel_members.channel_id = channels.id").
+		Where("channel_members.user_id = ?", userID).
+		Find(&channels).Error
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch channels"})
+		return
+	}
+
+	if len(channels) == 0 {
+		c.JSON(http.StatusOK, gin.H{"message": "you are not subscribed to any channels", "channels": []models.Channel{}})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":  "fetched subscribed channels successfully",
+		"channels": channels,
+	})
+}

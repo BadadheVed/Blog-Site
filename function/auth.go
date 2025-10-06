@@ -78,7 +78,6 @@ func Login(c *gin.Context) {
 
 	tokenStr, _ := token.SignedString(jwtSecret)
 
-	// Store in cookies
 	c.SetCookie("token", tokenStr, 3600*24, "/", "", false, true)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Login successful"})

@@ -2,6 +2,7 @@ package function
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -24,31 +25,53 @@ func CreateBlog(c *gin.Context) {
 		return
 	}
 
+	// Get Channel ID from route parameter
+	channelIDStr := c.Param("channelId")
+	channelID, err := uuid.Parse(channelIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid channel id"})
+		return
+	}
+
+	// Verify that channel exists
+	var channel models.Channel
+	if err := config.DB.First(&channel, "id = ?", channelID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "channel not found"})
+		return
+	}
+
+	// Parse input
 	var input struct {
 		Title string  `json:"title" binding:"required"`
 		Body  *string `json:"body"`
 	}
 
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
+	// Create Blog
 	blog := models.Blog{
-		ID:       uuid.New(),
-		Title:    input.Title,
-		Body:     input.Body,
-		AuthorId: userID,
+		ID:        uuid.New(),
+		Title:     input.Title,
+		Body:      input.Body,
+		AuthorId:  userID,
+		ChannelID: channelID,
 	}
 
 	if err := config.DB.Create(&blog).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create blog"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "blog created successfully", "blog": blog})
-}
+	// Reload the blog with related Author and Channel data
+	if err := config.DB.Preload("Author").Preload("Channel").First(&blog, "id = ?", blog.ID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load relations"})
+		return
+	}
 
+	c.JSON(http.StatusOK, gin.H{
+		"message": "blog created successfully under channel",
+		"blog":    blog,
+	})
+
+}
 func EditBlog(c *gin.Context) {
 	userIDStr, _, ok := middleware.ExtractUser(c)
 	if !ok {
@@ -145,7 +168,108 @@ func DeleteBlog(c *gin.Context) {
 
 }
 
-func getBlogs(c *gin.Context) {
-	page := c.Query("page")
-	limit := c.Query("limit")
+func GetBlogs(c *gin.Context) {
+	userIDStr, _, ok := middleware.ExtractUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+		return
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+		return
+	}
+
+	pageStr := c.DefaultQuery("page", "1")
+	limitStr := c.DefaultQuery("limit", "10")
+
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit < 1 {
+		limit = 10
+	}
+
+	offset := (page - 1) * limit
+
+	var channelIDs []uuid.UUID
+	if err := config.DB.Model(&models.ChannelMember{}).
+		Where("user_id = ?", userID).
+		Pluck("channel_id", &channelIDs).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch user channels"})
+		return
+	}
+
+	if len(channelIDs) == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"page":  page,
+			"limit": limit,
+			"total": 0,
+			"blogs": []models.Blog{},
+		})
+		return
+	}
+
+	var total int64
+	if err := config.DB.Model(&models.Blog{}).
+		Where("channel_id IN ?", channelIDs).
+		Count(&total).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to count blogs"})
+		return
+	}
+
+	var blogs []models.Blog
+	if err := config.DB.Preload("Author").Preload("Channel").
+		Where("channel_id IN ?", channelIDs).
+		Limit(limit).
+		Offset(offset).
+		Order("created_at DESC").
+		Find(&blogs).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch blogs"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"page":  page,
+		"limit": limit,
+		"total": total,
+		"blogs": blogs,
+	})
+}
+
+func GetBlogById(c *gin.Context) {
+	userIDStr, _, ok := middleware.ExtractUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+		return
+	}
+
+	_, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+		return
+	}
+
+	blogIDStr := c.Param("id")
+	blogID, err := uuid.Parse(blogIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid blog id"})
+		return
+	}
+
+	var blog models.Blog
+	if err := config.DB.Preload("Author").Preload("Channel").First(&blog, "id = ?", blogID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "blog not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch blog"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"blog": blog})
 }

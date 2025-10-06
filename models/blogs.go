@@ -13,4 +13,6 @@ type Blog struct {
 	CreatedAt time.Time `json:"created_at" gorm:"autoCreateTime"`
 	AuthorId  uuid.UUID `json:"author_id" gorm:"type:uuid;not null"`
 	Author    User      `gorm:"foreignKey:AuthorId;constraint:OnDelete:CASCADE"`
+	ChannelID uuid.UUID `json:"channel_id" gorm:"type:uuid;not null"`
+	Channel   Channel   `gorm:"foreignKey:ChannelID;constraint:OnDelete:CASCADE"`
 }

@@ -41,7 +41,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 
 		userID, _ := claims["user_id"].(string)
-		name, _ := claims["name"].(string)
+		email, _ := claims["email"].(string)
 
 		if strings.TrimSpace(userID) == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user id"})
@@ -49,16 +49,15 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Attach values to context
-		c.Set("userID", userID)
-		c.Set("name", name)
+		c.Set("user_id", userID)
+		c.Set("email", email)
 
 		c.Next()
 	}
 }
 
 func ExtractUser(c *gin.Context) (string, string, bool) {
-	uid, ok1 := c.Get("userID")
+	uid, ok1 := c.Get("user_id")
 	email, ok2 := c.Get("email")
 	if !ok1 || !ok2 {
 		return "", "", false
