@@ -1,4 +1,4 @@
-package function
+package notifications
 
 import (
 	"log"
@@ -8,10 +8,15 @@ import (
 	"github.com/yourname/blog-kafka/models"
 )
 
-func CreateNotificationForChannelMembers(channelID, authorID, blogID uuid.UUID, blogTitle string, notifType models.NotificationType) error {
+type NotificationService struct{}
+
+func (n *NotificationService) CreateNotificationForChannelMembers(channelID, authorID, blogID uuid.UUID, blogTitle string, notifType models.NotificationType) error {
 	var members []models.ChannelMember
 
-	if err := config.DB.Where("channel_id = ? AND user_id != ?", channelID, authorID).Find(&members).Error; err != nil {
+	// if err := config.DB.Where("channel_id = ? AND user_id != ?", channelID, authorID).Find(&members).Error; err != nil {
+	// 	return err
+	// }
+	if err := config.DB.Where("channel_id = ?", channelID).Find(&members).Error; err != nil {
 		return err
 	}
 

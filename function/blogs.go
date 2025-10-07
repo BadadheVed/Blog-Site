@@ -3,14 +3,23 @@ package function
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/yourname/blog-kafka/config"
 	middleware "github.com/yourname/blog-kafka/middlewares"
 	"github.com/yourname/blog-kafka/models"
+	"github.com/yourname/blog-kafka/workers"
+
 	"gorm.io/gorm"
 )
+
+var MyWorkerPool *workers.WorkerPool
+
+func SetWorkerPool(wp *workers.WorkerPool) {
+	MyWorkerPool = wp
+}
 
 func CreateBlog(c *gin.Context) {
 	userIDStr, _, ok := middleware.ExtractUser(c)
@@ -45,6 +54,15 @@ func CreateBlog(c *gin.Context) {
 		Title string  `json:"title" binding:"required"`
 		Body  *string `json:"body"`
 	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+		return
+	}
+
+	if strings.TrimSpace(input.Title) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Title cannot be empty"})
+		return
+	}
 
 	// Create Blog
 	blog := models.Blog{
@@ -65,6 +83,13 @@ func CreateBlog(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load relations"})
 		return
 	}
+	MyWorkerPool.Submit(workers.NotificationJob{
+		ChannelID: channelID,
+		AuthorID:  userID,
+		BlogID:    blog.ID,
+		BlogTitle: blog.Title,
+		Type:      models.NotificationTypeNew,
+	})
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "blog created successfully under channel",
@@ -121,6 +146,13 @@ func EditBlog(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update blog body"})
 		return
 	}
+	MyWorkerPool.Submit(workers.NotificationJob{
+		ChannelID: blog.ChannelID,
+		AuthorID:  userID,
+		BlogID:    blog.ID,
+		BlogTitle: blog.Title,
+		Type:      models.NotificationTypeEdited,
+	})
 
 	c.JSON(http.StatusOK, gin.H{"message": "blog body updated successfully"})
 }

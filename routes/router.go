@@ -9,5 +9,6 @@ func SetupRouter() *gin.Engine {
 
 	ChannelRoutes(r)
 	blogRouter(r)
+	userRouter(r)
 	return r
 }

@@ -6,9 +6,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/yourname/blog-kafka/function"
 	"github.com/yourname/blog-kafka/models"
 )
+
+type NotificationHandler interface {
+	CreateNotificationForChannelMembers(channelID, authorID, blogID uuid.UUID, blogTitle string, notificationType models.NotificationType) error
+}
 
 type NotificationJob struct {
 	ChannelID uuid.UUID
@@ -25,17 +28,27 @@ type WorkerPool struct {
 	activeWorkers int
 	wg            sync.WaitGroup
 	mu            sync.Mutex
+	handler       NotificationHandler
 }
 
-func NewWorkerPool(maxWorkers int, queueSize int, idleTimeout time.Duration) *WorkerPool {
+func NewWorkerPool(maxWorkers int, queueSize int, idleTimeout time.Duration, handler NotificationHandler) *WorkerPool {
 	return &WorkerPool{
 		JobQueue:    make(chan NotificationJob, queueSize),
 		MaxWorkers:  maxWorkers,
 		IdleTimeout: idleTimeout,
+		handler:     handler,
 	}
 }
 
 func (wp *WorkerPool) Submit(job NotificationJob) {
+	if wp == nil {
+		fmt.Println("WorkerPool is nil — cannot submit job")
+		return
+	}
+	if wp.JobQueue == nil {
+		fmt.Println("JobQueue is nil — worker pool not initialized properly")
+		return
+	}
 	wp.JobQueue <- job
 
 	wp.mu.Lock()
@@ -55,7 +68,7 @@ func (wp *WorkerPool) worker(id int) {
 		select {
 		case job := <-wp.JobQueue:
 			fmt.Printf("Worker %d processing job: %+v\n", id, job)
-			err := function.CreateNotificationForChannelMembers(job.ChannelID, job.AuthorID, job.BlogID, job.BlogTitle, job.Type)
+			err := wp.handler.CreateNotificationForChannelMembers(job.ChannelID, job.AuthorID, job.BlogID, job.BlogTitle, job.Type)
 			if err != nil {
 				fmt.Printf("Worker %d failed to create notification: %v\n", id, err)
 			}
