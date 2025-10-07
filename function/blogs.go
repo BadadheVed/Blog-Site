@@ -72,6 +72,7 @@ func CreateBlog(c *gin.Context) {
 	})
 
 }
+
 func EditBlog(c *gin.Context) {
 	userIDStr, _, ok := middleware.ExtractUser(c)
 	if !ok {
@@ -81,7 +82,7 @@ func EditBlog(c *gin.Context) {
 
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid User Id"})
 		return
 	}
 

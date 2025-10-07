@@ -20,6 +20,7 @@ type Notification struct {
 	Message   string           `json:"message" gorm:"type:text;not null"`
 	Read      bool             `json:"read" gorm:"default:false"`
 	CreatedAt time.Time        `json:"created_at" gorm:"autoCreateTime"`
-
-	User User `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+	BlogID    uuid.UUID        `json:"blog_id" gorm:"type:uuid"`
+	Blog      Blog             `gorm:"foreignKey:BlogID;constraint:OnDelete:CASCADE"`
+	User      User             `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
 }
