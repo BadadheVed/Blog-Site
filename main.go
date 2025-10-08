@@ -2,14 +2,9 @@ package main
 
 import (
 	"fmt"
-	"log"
-	"os"
 	"time"
 
-	"github.com/yourname/blog-kafka/config"
-	"github.com/yourname/blog-kafka/function"
 	"github.com/yourname/blog-kafka/notifications"
-	"github.com/yourname/blog-kafka/routes"
 	"github.com/yourname/blog-kafka/workers"
 )
 
@@ -21,22 +16,49 @@ func InitWorkerPool() {
 	fmt.Println("Go Workers Started")
 }
 
-func main() {
-	config.DBConnect()
-	InitWorkerPool()
-	if MyWorkerPool == nil {
-		log.Fatal("Worker pool initialization failed!")
-	}
-	function.SetWorkerPool(MyWorkerPool)
+// func main() {
+// 	config.DBConnect()
+// 	InitWorkerPool()
+// 	if MyWorkerPool == nil {
+// 		log.Fatal("Worker pool initialization failed!")
+// 	}
+// 	function.SetWorkerPool(MyWorkerPool)
 
-	r := routes.SetupRouter()
-	port := os.Getenv("PORT")
+// 	r := routes.SetupRouter()
+// 	port := os.Getenv("PORT")
 
-	if port == "" {
-		port = "8080"
-	}
+// 	if port == "" {
+// 		port = "8080"
+// 	}
 
-	log.Printf("Server running on port %s", port)
-	r.Run(":" + port)
+// 	log.Printf("Server running on port %s", port)
+// 	r.Run(":" + port)
 
-}
+// }
+
+// func main() {
+// 	brokers := []string{"localhost:9092"}
+
+// 	config := sarama.NewConfig()
+// 	config.Producer.Return.Successes = true
+// 	config.Producer.Partitioner = sarama.NewRoundRobinPartitioner
+// 	prod, err := sarama.NewSyncProducer(brokers, config)
+// 	if err != nil {
+// 		log.Fatalf("Failed to start producer: %v", err)
+// 	}
+// 	defer prod.Close()
+
+// 	for i := 0; i < 10; i++ {
+// 		msg := &sarama.ProducerMessage{
+// 			Topic: "test-topic",
+// 			Value: sarama.StringEncoder("Hello Kafka! #" + string(i)),
+// 		}
+
+// 		partition, offset, err := prod.SendMessage(msg)
+// 		if err != nil {
+// 			log.Fatalf("Failed to send message: %v", err)
+// 		}
+// 		log.Printf("Message sent to partition %d at offset %d\n", partition, offset)
+// 	}
+
+// }

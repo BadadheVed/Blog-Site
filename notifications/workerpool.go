@@ -1,4 +1,4 @@
-package workers
+package notifications
 
 import (
 	"fmt"
@@ -9,7 +9,6 @@ import (
 	"github.com/yourname/blog-kafka/models"
 )
 
-// NotificationJob represents one notification insert task
 type NotificationJob struct {
 	UserID    uuid.UUID
 	BlogID    uuid.UUID
@@ -17,12 +16,10 @@ type NotificationJob struct {
 	Type      models.NotificationType
 }
 
-// NotificationHandler defines how a notification is created
 type NotificationHandler interface {
 	CreateSingleNotification(job NotificationJob) error
 }
 
-// WorkerPool manages job submission and execution
 type WorkerPool struct {
 	JobQueue      chan NotificationJob
 	MaxWorkers    int
@@ -33,23 +30,20 @@ type WorkerPool struct {
 	handler       NotificationHandler
 }
 
-// NewWorkerPool initializes a new worker pool
-func NewWorkerPool(maxWorkers int, queueSize int, idleTimeout time.Duration, handler NotificationHandler) *WorkerPool {
+func NewWorkerPool(queueSize int, idleTimeout time.Duration, handler NotificationHandler) *WorkerPool {
 	return &WorkerPool{
 		JobQueue:    make(chan NotificationJob, queueSize),
-		MaxWorkers:  maxWorkers,
+		MaxWorkers:  5,
 		IdleTimeout: idleTimeout,
 		handler:     handler,
 	}
 }
 
-// Submit sends a job into the queue and spins up a worker if needed
 func (wp *WorkerPool) Submit(job NotificationJob) {
 	if wp == nil || wp.JobQueue == nil {
 		fmt.Println("WorkerPool not initialized properly")
 		return
 	}
-
 	wp.JobQueue <- job
 
 	wp.mu.Lock()
@@ -61,7 +55,6 @@ func (wp *WorkerPool) Submit(job NotificationJob) {
 	wp.mu.Unlock()
 }
 
-// worker consumes jobs from the queue
 func (wp *WorkerPool) worker(id int) {
 	defer wp.wg.Done()
 	fmt.Printf("Worker %d started\n", id)
@@ -69,10 +62,9 @@ func (wp *WorkerPool) worker(id int) {
 	for {
 		select {
 		case job := <-wp.JobQueue:
-			fmt.Printf("Worker %d processing job for user %s\n", id, job.UserID)
 			err := wp.handler.CreateSingleNotification(job)
 			if err != nil {
-				fmt.Printf("Worker %d failed to create notification: %v\n", id, err)
+				fmt.Printf("Worker %d error: %v\n", id, err)
 			}
 		case <-time.After(wp.IdleTimeout):
 			fmt.Printf("Worker %d idle timeout — stopping\n", id)
@@ -84,7 +76,6 @@ func (wp *WorkerPool) worker(id int) {
 	}
 }
 
-// Wait blocks until all workers finish
 func (wp *WorkerPool) Wait() {
 	wp.wg.Wait()
 }
