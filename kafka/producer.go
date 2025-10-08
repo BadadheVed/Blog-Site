@@ -1,40 +1,39 @@
 package kafka
 
 import (
-	"encoding/json"
 	"log"
 
 	"github.com/IBM/sarama"
 )
 
-var producer sarama.SyncProducer
+type Producer struct {
+	SyncProducer sarama.SyncProducer
+}
 
-func InitProducer(brokers []string) {
+func NewProducer(brokers []string) *Producer {
 	config := sarama.NewConfig()
 	config.Producer.Return.Successes = true
 	config.Producer.Partitioner = sarama.NewRoundRobinPartitioner
 
-	p, err := sarama.NewSyncProducer(brokers, config)
+	prod, err := sarama.NewSyncProducer(brokers, config)
 	if err != nil {
-		log.Fatalf("Failed to create Kafka producer: %v", err)
+		log.Fatalf("Failed to start producer: %v", err)
 	}
-	producer = p
-	log.Println("Kafka producer initialized")
+
+	return &Producer{SyncProducer: prod}
 }
 
-func PublishMessage(topic string, data interface{}) error {
-	value, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
+func (p *Producer) Send(topic, message string) {
 	msg := &sarama.ProducerMessage{
 		Topic: topic,
-		Value: sarama.ByteEncoder(value),
+		Value: sarama.StringEncoder(message),
 	}
-	partition, offset, err := producer.SendMessage(msg)
+
+	partition, offset, err := p.SyncProducer.SendMessage(msg)
 	if err != nil {
-		return err
+		log.Printf("Failed to send message: %v", err)
+		return
 	}
-	log.Printf("📤 Message sent to partition %d, offset %d", partition, offset)
-	return nil
+
+	log.Printf("Message sent to partition %d at offset %d\n", partition, offset)
 }

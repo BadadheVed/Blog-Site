@@ -1,64 +1,56 @@
 package main
 
 import (
-	"fmt"
+	"log"
+	"os"
 	"time"
 
+	"github.com/yourname/blog-kafka/config"
+	"github.com/yourname/blog-kafka/function"
+	"github.com/yourname/blog-kafka/kafka"
 	"github.com/yourname/blog-kafka/notifications"
-	"github.com/yourname/blog-kafka/workers"
+	"github.com/yourname/blog-kafka/routes"
 )
 
-var MyWorkerPool *workers.WorkerPool
+var (
+	MyWorkerPool *notifications.WorkerPool
+	MyNotifSvc   *notifications.NotificationService
+)
 
 func InitWorkerPool() {
+
 	handler := &notifications.NotificationService{}
-	MyWorkerPool = workers.NewWorkerPool(5, 100, 30*time.Second, handler)
-	fmt.Println("Go Workers Started")
+
+	MyWorkerPool = notifications.NewWorkerPool(100, 30*time.Second, handler)
+
+	handler.WorkerPool = MyWorkerPool
+	MyNotifSvc = handler
+
+	log.Println("[init] worker pool + notification service initialized")
 }
 
-// func main() {
-// 	config.DBConnect()
-// 	InitWorkerPool()
-// 	if MyWorkerPool == nil {
-// 		log.Fatal("Worker pool initialization failed!")
-// 	}
-// 	function.SetWorkerPool(MyWorkerPool)
+func main() {
 
-// 	r := routes.SetupRouter()
-// 	port := os.Getenv("PORT")
+	config.DBConnect()
 
-// 	if port == "" {
-// 		port = "8080"
-// 	}
+	InitWorkerPool()
 
-// 	log.Printf("Server running on port %s", port)
-// 	r.Run(":" + port)
+	function.SetWorkerPool(MyWorkerPool)
 
-// }
+	brokers := []string{"localhost:9092"}
+	groupID := "notification-group"
+	topic := "blog-events"
 
-// func main() {
-// 	brokers := []string{"localhost:9092"}
+	go kafka.StartBlogEventConsumer(MyNotifSvc, brokers, groupID, topic)
+	log.Println("[kafka] blog event consumer started")
 
-// 	config := sarama.NewConfig()
-// 	config.Producer.Return.Successes = true
-// 	config.Producer.Partitioner = sarama.NewRoundRobinPartitioner
-// 	prod, err := sarama.NewSyncProducer(brokers, config)
-// 	if err != nil {
-// 		log.Fatalf("Failed to start producer: %v", err)
-// 	}
-// 	defer prod.Close()
-
-// 	for i := 0; i < 10; i++ {
-// 		msg := &sarama.ProducerMessage{
-// 			Topic: "test-topic",
-// 			Value: sarama.StringEncoder("Hello Kafka! #" + string(i)),
-// 		}
-
-// 		partition, offset, err := prod.SendMessage(msg)
-// 		if err != nil {
-// 			log.Fatalf("Failed to send message: %v", err)
-// 		}
-// 		log.Printf("Message sent to partition %d at offset %d\n", partition, offset)
-// 	}
-
-// }
+	r := routes.SetupRouter()
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	log.Printf("[server] listening on :%s", port)
+	if err := r.Run(":" + port); err != nil {
+		log.Fatalf("[server] failed to run: %v", err)
+	}
+}

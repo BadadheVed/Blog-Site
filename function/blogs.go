@@ -1,6 +1,7 @@
 package function
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -8,16 +9,17 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/yourname/blog-kafka/config"
+	"github.com/yourname/blog-kafka/kafka"
 	middleware "github.com/yourname/blog-kafka/middlewares"
 	"github.com/yourname/blog-kafka/models"
-	"github.com/yourname/blog-kafka/workers"
+	"github.com/yourname/blog-kafka/notifications"
 
 	"gorm.io/gorm"
 )
 
-var MyWorkerPool *workers.WorkerPool
+var MyWorkerPool *notifications.WorkerPool
 
-func SetWorkerPool(wp *workers.WorkerPool) {
+func SetWorkerPool(wp *notifications.WorkerPool) {
 	MyWorkerPool = wp
 }
 
@@ -83,14 +85,17 @@ func CreateBlog(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load relations"})
 		return
 	}
-	MyWorkerPool.Submit(workers.NotificationJob{
+	payload := kafka.NotificationPayload{
 		ChannelID: channelID,
 		AuthorID:  userID,
 		BlogID:    blog.ID,
 		BlogTitle: blog.Title,
 		Type:      models.NotificationTypeNew,
-	})
+	}
 
+	if err := kafka.PublishNotification(payload); err != nil {
+		log.Printf("Failed to publish notification to Kafka: %v", err)
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"message": "blog created successfully under channel",
 		"blog":    blog,
@@ -146,13 +151,17 @@ func EditBlog(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update blog body"})
 		return
 	}
-	MyWorkerPool.Submit(workers.NotificationJob{
+	payload := kafka.NotificationPayload{
 		ChannelID: blog.ChannelID,
 		AuthorID:  userID,
 		BlogID:    blog.ID,
 		BlogTitle: blog.Title,
 		Type:      models.NotificationTypeEdited,
-	})
+	}
+
+	if err := kafka.PublishNotification(payload); err != nil {
+		log.Printf("Failed to publish notification to Kafka: %v", err)
+	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "blog body updated successfully"})
 }

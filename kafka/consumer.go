@@ -2,73 +2,65 @@ package kafka
 
 import (
 	"context"
-	"encoding/json"
 	"log"
-	"time"
+	"os"
+	"os/signal"
+	"syscall"
 
-	"github.com/google/uuid"
-	"github.com/segmentio/kafka-go"
-	"github.com/yourname/blog-kafka/models"
-	"github.com/yourname/blog-kafka/notifications"
+	"github.com/IBM/sarama"
 )
 
-type NotificationEvent struct {
-	ChannelID uuid.UUID               `json:"channel_id"`
-	AuthorID  uuid.UUID               `json:"author_id"`
-	BlogID    uuid.UUID               `json:"blog_id"`
-	BlogTitle string                  `json:"blog_title"`
-	Type      models.NotificationType `json:"type"`
-}
+// StartConsumer starts a Sarama consumer group that calls handler for each message.
+// Do NOT defer cancel() here; the goroutine will cancel on OS signal.
+func StartConsumer(brokers []string, groupID, topic string, handler func(message string)) {
+	config := sarama.NewConfig()
+	config.Consumer.Return.Errors = true
 
-type Consumer struct {
-	Reader     *kafka.Reader
-	NotifSvc   *notifications.NotificationService
-	TopicLabel string
-}
-
-func NewConsumer(brokers []string, topic, groupID, label string, notifSvc *notifications.NotificationService) *Consumer {
-	r := kafka.NewReader(kafka.ReaderConfig{
-		Brokers: brokers,
-		Topic:   topic,
-		GroupID: groupID,
-	})
-
-	return &Consumer{
-		Reader:     r,
-		NotifSvc:   notifSvc,
-		TopicLabel: label,
+	client, err := sarama.NewConsumerGroup(brokers, groupID, config)
+	if err != nil {
+		log.Fatalf("[kafka] Error creating consumer group client: %v", err)
 	}
+
+	// Context we can cancel on SIGINT/SIGTERM
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Listen for termination signals and cancel context when received
+	go func() {
+		sigterm := make(chan os.Signal, 1)
+		signal.Notify(sigterm, syscall.SIGINT, syscall.SIGTERM)
+		<-sigterm
+		log.Println("[kafka] shutdown signal received, canceling consumer context")
+		cancel()
+	}()
+
+	// Run consumer loop in background goroutine
+	go func() {
+		for {
+			handlerWrapper := &consumerGroupHandler{handler: handler}
+			if err := client.Consume(ctx, []string{topic}, handlerWrapper); err != nil {
+				// log errors and continue; if context canceled, exit loop
+				log.Printf("[kafka] consumer error: %v", err)
+			}
+			if ctx.Err() != nil {
+				// context canceled -> exit goroutine
+				log.Println("[kafka] consumer context canceled, exiting consumer loop")
+				return
+			}
+		}
+	}()
 }
 
-func (c *Consumer) Start(ctx context.Context) {
-	log.Printf("Starting Kafka consumer for topic [%s]", c.TopicLabel)
-	for {
-		m, err := c.Reader.FetchMessage(ctx)
-		if err != nil {
-			log.Println("FetchMessage error:", err)
-			time.Sleep(2 * time.Second)
-			continue
-		}
+type consumerGroupHandler struct {
+	handler func(message string)
+}
 
-		var event NotificationEvent
-		if err := json.Unmarshal(m.Value, &event); err != nil {
-			log.Printf("Invalid event: %v", err)
-			continue
-		}
+func (consumerGroupHandler) Setup(_ sarama.ConsumerGroupSession) error   { return nil }
+func (consumerGroupHandler) Cleanup(_ sarama.ConsumerGroupSession) error { return nil }
 
-		log.Printf("[%s] Received notification event: %+v", c.TopicLabel, event)
-
-		err = c.NotifSvc.CreateNotificationForChannelMembers(
-			event.ChannelID,
-			event.AuthorID,
-			event.BlogID,
-			event.BlogTitle,
-			event.Type,
-		)
-		if err != nil {
-			log.Printf("Error creating notifications: %v", err)
-		}
-
-		c.Reader.CommitMessages(ctx, m)
+func (h consumerGroupHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
+	for msg := range claim.Messages() {
+		h.handler(string(msg.Value))
+		sess.MarkMessage(msg, "")
 	}
+	return nil
 }
