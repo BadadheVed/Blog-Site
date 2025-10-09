@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/yourname/blog-kafka/config"
 	"github.com/yourname/blog-kafka/function"
 	"github.com/yourname/blog-kafka/notifications"
@@ -42,10 +43,16 @@ func main() {
 	log.Println("[init] Kafka producer initialized in function package")
 
 	r := routes.SetupRouter()
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"Message": "Everything Fine And Running On The port " + port,
+		})
+	})
 	log.Printf("[server] Listening on :%s", port)
 	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("[server] Failed to run: %v", err)

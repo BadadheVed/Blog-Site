@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/joho/godotenv"
 	"github.com/yourname/blog-kafka/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -14,10 +13,7 @@ import (
 var DB *gorm.DB
 
 func DBConnect() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("❌ Error loading .env file")
-	}
+
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
 		log.Fatal("DATABASE_URL is not set in environment variables")

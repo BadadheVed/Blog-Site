@@ -1,0 +1,62 @@
+version: "3.8"
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "password"
+      POSTGRES_DB: "blogdb"
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres-init:/docker-entrypoint-initdb.d
+
+  blog-app:
+    image: go-kafka-setup
+    container_name: blogs-kafka
+    depends_on:
+      - kafka
+      - postgres
+    environment:
+      DATABASE_URL: "postgres://postgres:password@postgres:5432/blogdb?sslmode=disable"
+      KAFKA_BROKERS: "kafka:9092"
+    ports:
+      - "8080:8080"
+
+    entrypoint:
+      [
+        "./wait-for-it.sh",
+        "postgres:5432",
+        "--timeout=60",
+        "--",
+        "./wait-for-it.sh",
+        "kafka:9092",
+        "--timeout=60",
+        "--",
+        "./blogs-kafka",
+      ]
