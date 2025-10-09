@@ -1,7 +1,6 @@
 package function
 
 import (
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,15 +12,14 @@ import (
 
 	middleware "github.com/yourname/blog-kafka/middlewares"
 	"github.com/yourname/blog-kafka/models"
-	"github.com/yourname/blog-kafka/notifications"
 
 	"gorm.io/gorm"
 )
 
-var MyWorkerPool *notifications.WorkerPool
+var kafkaProducer *kafka.Producer
 
-func SetWorkerPool(wp *notifications.WorkerPool) {
-	MyWorkerPool = wp
+func InitKafkaProducer(producer *kafka.Producer) {
+	kafkaProducer = producer
 }
 
 func CreateBlog(c *gin.Context) {
@@ -37,7 +35,6 @@ func CreateBlog(c *gin.Context) {
 		return
 	}
 
-	// Get Channel ID from route parameter
 	channelIDStr := c.Param("channelId")
 	channelID, err := uuid.Parse(channelIDStr)
 	if err != nil {
@@ -45,14 +42,12 @@ func CreateBlog(c *gin.Context) {
 		return
 	}
 
-	// Verify that channel exists
 	var channel models.Channel
 	if err := config.DB.First(&channel, "id = ?", channelID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "channel not found"})
 		return
 	}
 
-	// Parse input
 	var input struct {
 		Title string  `json:"title" binding:"required"`
 		Body  *string `json:"body"`
@@ -67,7 +62,6 @@ func CreateBlog(c *gin.Context) {
 		return
 	}
 
-	// Create Blog
 	blog := models.Blog{
 		ID:        uuid.New(),
 		Title:     input.Title,
@@ -81,7 +75,6 @@ func CreateBlog(c *gin.Context) {
 		return
 	}
 
-	// Reload the blog with related Author and Channel data
 	if err := config.DB.Preload("Author").Preload("Channel").First(&blog, "id = ?", blog.ID).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load relations"})
 		return
@@ -94,9 +87,8 @@ func CreateBlog(c *gin.Context) {
 		Type:      models.NotificationTypeNew,
 	}
 
-	if err := kafka.PublishNotification(payload); err != nil {
-		log.Printf("Failed to publish notification to Kafka: %v", err)
-	}
+	kafkaProducer.PublishNotification(payload, true)
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "blog created successfully under channel",
 		"blog":    blog,
@@ -160,9 +152,7 @@ func EditBlog(c *gin.Context) {
 		Type:      models.NotificationTypeEdited,
 	}
 
-	if err := kafka.PublishNotification(payload); err != nil {
-		log.Printf("Failed to publish notification to Kafka: %v", err)
-	}
+	kafkaProducer.PublishNotification(payload, true)
 
 	c.JSON(http.StatusOK, gin.H{"message": "blog body updated successfully"})
 }

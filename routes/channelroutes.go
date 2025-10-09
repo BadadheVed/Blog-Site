@@ -14,5 +14,6 @@ func ChannelRoutes(r *gin.Engine) {
 		ch.POST("/create", function.CreateChannel)
 		ch.POST("/:id/subscribe", function.SubscribeChannel)
 		ch.GET("/getChannels", function.GetChannels)
+		ch.POST("/join/:channelId", function.JoinChannel)
 	}
 }

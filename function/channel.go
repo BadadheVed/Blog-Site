@@ -168,3 +168,60 @@ func GetChannels(c *gin.Context) {
 		"channels": channels,
 	})
 }
+
+func JoinChannel(c *gin.Context) {
+	userIDStr, _, ok := middleware.ExtractUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+		return
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id in token"})
+		return
+	}
+
+	channelIDStr := c.Param("channelId")
+	channelID, err := uuid.Parse(channelIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid channel id"})
+		return
+	}
+
+	var channel models.Channel
+	if err := config.DB.First(&channel, "id = ?", channelID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "channel not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+
+	var existing models.ChannelMember
+	err = config.DB.Where("user_id = ? AND channel_id = ?", userID, channelID).First(&existing).Error
+	if err == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "already joined this channel"})
+		return
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+		return
+	}
+
+	sub := models.ChannelMember{
+		ID:        uuid.New(),
+		UserID:    userID,
+		ChannelID: channelID,
+	}
+	if err := config.DB.Create(&sub).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to join channel"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "joined channel successfully",
+		"channel": sub,
+	})
+}

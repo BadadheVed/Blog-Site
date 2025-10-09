@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/yourname/blog-kafka/config"
+	"github.com/yourname/blog-kafka/function"
 	"github.com/yourname/blog-kafka/notifications"
 	"github.com/yourname/blog-kafka/routes"
 	"github.com/yourname/blog-kafka/setup"
@@ -33,7 +34,12 @@ func main() {
 	config.DBConnect()
 	InitWorkerPool()
 
-	setup.StartKafkaSetup(MyWorkerPool, MyNotifSvc)
+	producer, err := setup.StartKafkaSetup(MyWorkerPool, MyNotifSvc)
+	if err != nil {
+		log.Fatalf("[kafka] Failed to setup Kafka: %v", err)
+	}
+	function.InitKafkaProducer(producer)
+	log.Println("[init] Kafka producer initialized in function package")
 
 	r := routes.SetupRouter()
 	port := os.Getenv("PORT")
