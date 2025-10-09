@@ -9,7 +9,6 @@ import (
 	"github.com/yourname/blog-kafka/notifications"
 )
 
-// BlogEvent is the message shape produced by your API when a blog is created/edited
 type BlogEvent struct {
 	ChannelID uuid.UUID               `json:"channel_id"`
 	AuthorID  uuid.UUID               `json:"author_id"`
@@ -18,8 +17,6 @@ type BlogEvent struct {
 	Type      models.NotificationType `json:"type"`
 }
 
-// StartBlogEventConsumer wires the generic consumer to your NotificationService.
-// It unmarshals each message into BlogEvent and calls CreateNotificationForChannelMembers.
 func StartBlogEventConsumer(notifSvc *notifications.NotificationService, brokers []string, groupID, topic string) {
 	StartConsumer(brokers, groupID, topic, func(message string) {
 		var ev BlogEvent

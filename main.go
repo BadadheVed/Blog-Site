@@ -6,10 +6,9 @@ import (
 	"time"
 
 	"github.com/yourname/blog-kafka/config"
-	"github.com/yourname/blog-kafka/function"
-	"github.com/yourname/blog-kafka/kafka"
 	"github.com/yourname/blog-kafka/notifications"
 	"github.com/yourname/blog-kafka/routes"
+	"github.com/yourname/blog-kafka/setup"
 )
 
 var (
@@ -32,25 +31,18 @@ func InitWorkerPool() {
 func main() {
 
 	config.DBConnect()
-
 	InitWorkerPool()
 
-	function.SetWorkerPool(MyWorkerPool)
-
-	brokers := []string{"localhost:9092"}
-	groupID := "notification-group"
-	topic := "blog-events"
-
-	go kafka.StartBlogEventConsumer(MyNotifSvc, brokers, groupID, topic)
-	log.Println("[kafka] blog event consumer started")
+	setup.StartKafkaSetup(MyWorkerPool, MyNotifSvc)
 
 	r := routes.SetupRouter()
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
-	log.Printf("[server] listening on :%s", port)
+	log.Printf("[server] Listening on :%s", port)
 	if err := r.Run(":" + port); err != nil {
-		log.Fatalf("[server] failed to run: %v", err)
+		log.Fatalf("[server] Failed to run: %v", err)
 	}
+
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/yourname/blog-kafka/config"
 	"github.com/yourname/blog-kafka/kafka"
+
 	middleware "github.com/yourname/blog-kafka/middlewares"
 	"github.com/yourname/blog-kafka/models"
 	"github.com/yourname/blog-kafka/notifications"
