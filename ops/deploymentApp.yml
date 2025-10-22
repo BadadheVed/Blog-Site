@@ -21,7 +21,7 @@ spec:
         - name: KAFKA_BROKERS
           valueFrom:
             configMapKeyRef:
-              name: kafka-config
+              name: app-config
               key: KAFKA_BROKERS
         - name: DATABASE_URL
           valueFrom:
@@ -31,7 +31,7 @@ spec:
         readinessProbe:
           exec:
             command: ["sh", "-c", "nc -z kafka 9092 && nc -z postgres 5432"]
-          initialDelaySeconds: 5
+          initialDelaySeconds: 20
           periodSeconds: 5
 
 

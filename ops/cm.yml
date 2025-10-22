@@ -5,5 +5,5 @@ metadata:
 data:
   KAFKA_BROKERS: "kafka:9092"
   POSTGRES_USER: "postgres"
-  POSTGRES_PASSWORD: "pasword"
+  POSTGRES_PASSWORD: "password"
   POSTGRES_DB: "blogdb"
