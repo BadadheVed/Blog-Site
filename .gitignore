@@ -39,7 +39,7 @@ coverage.out
 *.bak
 
 
-go.sum
+
 
 
 dist/
