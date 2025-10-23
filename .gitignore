@@ -44,3 +44,4 @@ go.sum
 
 dist/
 build/
+ops/
